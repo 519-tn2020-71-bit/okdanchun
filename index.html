@@ -757,6 +757,8 @@ function drawTile(ch,x,y,sx,sy,t){
   else if(ch==="w"){R(sx,sy,16,16,"#a8865a");R(sx+2,sy+7,5,3,"#95744c");R(sx+9,sy+11,5,3,"#95744c");R(sx+10,sy+6,3,2,"#b89668");
     R(sx,sy,16,4,"#454a52");R(sx,sy+3,16,1,"#2f3338");R(sx,sy,16,1,"#6b717a");R(sx+4,sy+1,1,2,"#3a3e45");R(sx+10,sy+1,1,2,"#3a3e45")}
 }
+/* 나무 칸의 바닥: 둘레에서 가장 많은 땅 칸을 따른다(돌바닥·모래 위의 나무 밑에 풀 네모가 생기지 않게) */
+function treeGround(m,x,y){if(m._tg&&m._tg[y*m.w+x])return m._tg[y*m.w+x];const c={};for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){const k=tileAt(m,x+dx,y+dy);if(k==="T"||k==="~"||k==="w"||k==="f")continue;c[k]=(c[k]||0)+1}let best=".",n=0;for(const k in c)if(c[k]>n){n=c[k];best=k}m._tg=m._tg||{};return m._tg[y*m.w+x]=(best===","?".":best)}
 function drawTree(sx,sy,t,seed){const pk=(Math.floor(seed*7)%3===0)?"o_pine":"o_tree";if(PROP[pk]){const sw=Math.sin(t*1.3+(seed||0))*0.02;ctx.fillStyle="rgba(0,0,0,.2)";ctx.beginPath();ctx.ellipse(sx+8,sy+15,11,3,0,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(sx+8,sy+16);ctx.transform(1,0,sw,1,0,0);drawProp(pk,0,0);ctx.restore();return}const o=Math.round(Math.sin(t*1.3+(seed||0))*1.2);
   R(sx+6,sy+2,4,14,"#5a3b22");R(sx+6,sy+2,1,14,"#6e4a2c");R(sx+2,sy+15,12,1,"rgba(0,0,0,.25)");
   blob(sx+8+o,sy-6,12,"#3f6b3a","#5c8c4a","#315a2e");blob(sx+2+o,sy-1,7,"#3f6b3a","#5c8c4a","#315a2e");blob(sx+14+o,sy-1,7,"#3f6b3a","#5c8c4a","#315a2e");
@@ -962,7 +964,7 @@ function draw(t){
   cx=Math.round(cx);cy=Math.round(cy);if(G.shake>0){cx+=Math.round((Math.random()-.5)*G.shake*2);cy+=Math.round((Math.random()-.5)*G.shake*2)}G.cam={x:cx,y:cy};
   const x0=Math.max(0,Math.floor(cx/T)),y0=Math.max(0,Math.floor(cy/T)),x1=Math.min(m.w-1,Math.ceil((cx+VW)/T)),y1=Math.min(m.h-1,Math.ceil((cy+VH)/T));
   const dr=[];
-  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const ch=m.g[y][x];drawTile(ch,x,y,x*T-cx,y*T-cy,t);if(ch==="T")dr.push({y:(y+1)*T,f:()=>drawTree(x*T-cx,y*T-cy,t,x*0.9+y*1.7)})}
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const ch=m.g[y][x];drawTile(ch==="T"?treeGround(m,x,y):ch,x,y,x*T-cx,y*T-cy,t);if(ch==="T")dr.push({y:(y+1)*T,f:()=>drawTree(x*T-cx,y*T-cy,t,x*0.9+y*1.7)})}
   for(let y=Math.min(m.h-1,y1+3);y>y1;y--)for(let x=x0;x<=x1;x++)if(m.g[y][x]==="T")dr.push({y:(y+1)*T,f:()=>drawTree(x*T-cx,y*T-cy,t,x*0.9+y*1.7)});
   for(const o of m.objs){if(o.hide&&o.hide())continue;const sx=o.x*T-cx,sy=o.y*T-cy;if(sx>VW+90||sx+o.w*T<-90||sy>VH+100||sy+o.h*T<-100)continue;
     dr.push({y:(o.y+o.h)*T-(o.k==="door"?8:0),f:()=>{const pk=propFor(o);if(pk&&PROP[pk]){ctx.fillStyle="rgba(0,0,0,.18)";ctx.beginPath();ctx.ellipse(sx+o.w*T/2,sy+o.h*T-2,o.w*T*0.5,4,0,0,Math.PI*2);ctx.fill();drawProp(pk,sx+o.w*T/2,sy+o.h*T+(o.k==="gate"?6:2))}else if(OBJDRAW[o.k])OBJDRAW[o.k](o,sx,sy,t)}})}
