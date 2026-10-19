@@ -3067,5 +3067,95 @@ async function c4See(){
   if(j&&j.route&&ROUTES[j.route]){const sv=loadSave()||{};G.rec=(sv.route===j.route?sv.rec:[])||[];startChapter(j.route,j.ch)}else showTitle()})();
 
 </script>
+<script id="scene">
+/* ═════════ 장면 덧붙임(여러 게임 공통, 2026-10-19): 배경 꾸미기 + 장면 바탕 소리 ═════════
+   최척전의 cdeco.js·cambience.js 를 다른 게임에도 쓰게 묶은 것. 지도 이름이 게임마다 달라도, 지도가 바뀌면 저절로 꾸민다.
+   이전 게임에는 돌아다니는 닭을 넣지 않는다(정해진 길을 걷는 연출을 막을 수 있어서). 넣는 법: node _작업원본/sceneput.js <배포폴더>/index.html */
+(()=>{if(window.__scene)return;window.__scene=1;
+/* ═════════ 배경 꾸미기: 밋밋한 땅에 얼룩과 잔것을 깐다(교사 의견 2026-10-16 “배경이 너무 밋밋하다”) ═════════
+   - 땅 색의 얼룩: 풀·흙·모래·눈 칸에 넓은 진하고 옅은 얼룩을 덧칠해 같은 칸이 되풀이돼 보이지 않게
+   - 잔것: 바닥 종류마다 꽃·잔풀·돌·덤불 / 고사리·버섯·바위 / 조개·유목·해초 / 갈대·연잎 / 자갈·낙엽 / 눈더미
+   - 마을 살림: 짚더미, 장작, 소쿠리, 항아리, 돌아다니는 닭
+   모두 지나갈 수 있는 장식이라 길을 막지 않는다. 지도를 만들 때마다 저절로 붙는다(같은 지도면 늘 같은 자리). */
+(()=>{const d0=drawTile;
+  const nz=(x,y)=>{const f=(a,b)=>((hash2(a,b)&1023)/1023);const X=x/5,Y=y/5,x0=Math.floor(X),y0=Math.floor(Y),fx=X-x0,fy=Y-y0,sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+    const a=f(x0,y0),b=f(x0+1,y0),c=f(x0,y0+1),d=f(x0+1,y0+1);return a+(b-a)*sx+(c-a)*sy+(a-b-c+d)*sx*sy};
+  drawTile=function(ch,x,y,sx,sy,t){d0(ch,x,y,sx,sy,t);
+    if(!".,TfysS:xn".includes(ch))return;const v=nz(x,y)-0.5;if(Math.abs(v)<0.08)return;
+    ctx.fillStyle=v>0?`rgba(255,250,200,${Math.min(0.14,v*0.32)})`:`rgba(20,40,10,${Math.min(0.16,-v*0.36)})`;ctx.fillRect(sx,sy,16,16)}})();
+function decoRand(m){let s=(m.w*73856093^m.h*19349663^(m.g[1]?m.g[1].join("").length*83492791:0))>>>0||1;return()=>(s=(s*1103515245+12345)>>>0)/4294967296}
+function deco(m,theme){if(!m||m._deco)return m;m._deco=1;const r=decoRand(m),occ=new Set();
+  for(const o of m.objs)for(let y=o.y-1;y<o.y+o.h+1;y++)for(let x=o.x;x<o.x+o.w;x++)occ.add(x+","+y);
+  const at=(x,y)=>tileAt(m,x,y),nearW=(x,y)=>[[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>at(x+a,y+b)==="~"),add=(x,y,t)=>m.objs.push({k:"dc",t,x,y,w:1,h:1,pass:1,s:r()});
+  for(let y=1;y<m.h-1;y++)for(let x=1;x<m.w-1;x++){if(occ.has(x+","+y))continue;const c=at(x,y),q=r();
+    if(c==="~"){if(nearW(x,y)&&[[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>"~=".indexOf(at(x+a,y+b))<0)&&q<0.18)add(x,y,"lily");continue}
+    if((c==="."||c==="s"||c==="y")&&nearW(x,y)&&q<0.35){add(x,y,"reed");continue}
+    if(c==="."||c===","){if(q<0.05)add(x,y,"flower");else if(q<0.11)add(x,y,"tuft");else if(q<0.13)add(x,y,"stone");else if(q<0.145)add(x,y,"bush");
+      else if((theme==="village"||theme==="china")&&q<0.158)add(x,y,["hay","wood","basket","pot"][Math.floor(r()*4)])}
+    else if(c==="y"){if(q<0.07)add(x,y,"fern");else if(q<0.1)add(x,y,"tuft");else if(q<0.115)add(x,y,"mush");else if(q<0.13)add(x,y,"stone")}
+    else if(c==="s"){if(q<0.04)add(x,y,"shell");else if(q<0.06)add(x,y,"drift");else if(q<0.08)add(x,y,"weed")}
+    else if(c===":"||c==="x"){if(q<0.06)add(x,y,"pebble");else if(q<0.08)add(x,y,"leaf")}
+    else if(c==="n"){if(q<0.08)add(x,y,"snowlump")}}
+  return m}
+OBJDRAW.dc=(o,sx,sy,t)=>{const s=o.s,ox=Math.round(s*6)-3,K="#1d1813",sw=Math.round(Math.sin(t*2+o.x*1.3)*1);sx+=ox;
+  switch(o.t){
+    case "flower":{const c=["#e05a4a","#f0cf55","#f4f0e6","#e9a4b8","#9b7fd1"][Math.floor(s*5)];for(let i=0;i<3;i++){const fx=sx+4+i*4,fy=sy+8+((i*7+Math.floor(s*9))%4);R(fx,fy+2,1,4,"#4c7a36");R(fx-1+sw*(i%2),fy,3,2,c);R(fx+sw*(i%2),fy,1,1,"#fff6c8")}break}
+    case "tuft":for(let i=0;i<4;i++)R(sx+4+i*2+(i%2?sw:0),sy+9-(i%2)*2,1,5+(i%2)*2,i%2?"#4f7f3c":"#5d8e4c");break;
+    case "stone":R(sx+4,sy+10,8,4,K);R(sx+5,sy+10,6,3,"#9c988e");R(sx+6,sy+10,3,1,"#c4c0b6");break;
+    case "bush":R(sx+2,sy+6,12,9,K);R(sx+3,sy+6,10,8,"#3f6b3a");R(sx+4,sy+6,5,3,"#5c8c4a");R(sx+9,sy+9,2,2,"#e05a4a");break;
+    case "fern":for(let i=0;i<5;i++){R(sx+3+i*2,sy+12-i%3,1,4+i%3,"#4f7f3c");R(sx+2+i*2+sw,sy+10-i%3,3,1,"#6fa954")}break;
+    case "mush":R(sx+6,sy+11,2,4,"#efe6cf");R(sx+4,sy+9,6,3,K);R(sx+5,sy+9,4,2,"#c0392b");R(sx+6,sy+9,1,1,"#fff");break;
+    case "shell":R(sx+5,sy+10,5,4,K);R(sx+6,sy+10,3,3,"#f4d6c8");R(sx+7,sy+11,1,2,"#d9a090");break;
+    case "drift":R(sx+2,sy+11,12,3,K);R(sx+3,sy+11,10,2,"#a08a6a");R(sx+5,sy+11,3,1,"#c4b08a");break;
+    case "weed":R(sx+4,sy+11,8,2,"#4c7a36");R(sx+6,sy+9,1,3,"#3f6b3a");R(sx+9,sy+10,1,2,"#3f6b3a");break;
+    case "reed":for(let i=0;i<4;i++){const h=8+((i*5+Math.floor(s*7))%5);R(sx+3+i*3+(i%2?sw:0),sy+15-h,1,h,"#7f8a4c");R(sx+3+i*3+(i%2?sw:0),sy+15-h-2,1,3,"#8a6a44")}break;
+    case "lily":ctx.fillStyle="#4f8a4a";ctx.beginPath();ctx.ellipse(sx+8,sy+9,5,3,0,0.4,Math.PI*2);ctx.lineTo(sx+8,sy+9);ctx.fill();if(s>0.6){R(sx+7,sy+7,2,2,"#f4c6d2")}break;
+    case "pebble":R(sx+3,sy+11,2,2,"#9c988e");R(sx+8,sy+9,3,2,"#8f8a7e");R(sx+11,sy+12,2,1,"#a8a296");break;
+    case "leaf":R(sx+4,sy+10,3,2,"#c98a3a");R(sx+9,sy+12,3,2,"#a8642a");R(sx+7,sy+8,2,1,"#d9a050");break;
+    case "snowlump":R(sx+3,sy+10,10,4,"#dde4ec");R(sx+4,sy+9,7,2,"#ffffff");break;
+    case "hay":R(sx+1,sy+4,14,11,K);R(sx+2,sy+5,12,9,"#d9b45a");for(let i=0;i<5;i++)R(sx+3+i*2,sy+6,1,7,"#b08a3a");R(sx+2,sy+9,12,1,"#8c6a2a");break;
+    case "wood":for(let i=0;i<3;i++){R(sx+1,sy+7+i*3,14,3,K);R(sx+2,sy+8+i*3,12,1,"#8e6a44");R(sx+2,sy+7+i*3,2,2,"#c9a36a");R(sx+12,sy+7+i*3,2,2,"#c9a36a")}break;
+    case "basket":R(sx+3,sy+9,10,6,K);R(sx+4,sy+10,8,4,"#c9a36a");for(let i=0;i<4;i++)R(sx+4+i*2,sy+10,1,4,"#a8835a");R(sx+5,sy+8,6,2,"#e05a4a");break;
+    case "pot":R(sx+4,sy+6,8,9,K);R(sx+5,sy+7,6,7,"#6b3f22");R(sx+5,sy+6,6,1,"#5a321a");R(sx+6,sy+8,1,4,"#8a5a34");break}};
+
+const themeOf=m=>{let w=0,y=0,l=0;for(const r of m.g)for(const c of r){if(c==="~")w++;else if(c==="y"||c==="r")y++;else l++}const houses=m.objs.filter(o=>o.k==="choga"||o.k==="giwa"||o.k==="house").length;return houses>=2?"village":w>l?"shore":y>l*0.4?"mount":"field"};
+setInterval(()=>{try{if(G.map&&!G.map._deco)deco(G.map,themeOf(G.map))}catch(e){}},250);
+/* ═════════ 장면의 바탕 소리 (교사 질문 2026-10-19 “효과음도 충분하니?”) ═════════
+   사건 효과음(발소리·화살·북·천둥 등) 말고, 장면에 깔리는 소리를 지도와 상황을 보고 띄엄띄엄 낸다. 모두 직접 합성한 소리다.
+   바다·강: 파도 / 낮 바다: 갈매기 / 풍랑: 비·거센 바람 / 배 위: 삐걱 / 낮 땅: 새소리 / 밤: 풀벌레·개구리 / 절: 풍경·목탁 / 사람 많음: 웅성거림 */
+function amb(kind){if(typeof AU==="undefined"||!AU.ctx||!AU.sfxOn)return;const ac=AU.ctx,t=ac.currentTime+0.02,v=0.6;
+  const env=(node,a,peak,dur)=>{const g=ac.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(peak*v,t+a);g.gain.exponentialRampToValueAtTime(0.0008,t+dur);node.connect(g);auOut(g,true);return g};
+  const tone=(type,f,f2,dur,peak,at)=>{const o=ac.createOscillator();o.type=type;const s=t+(at||0);o.frequency.setValueAtTime(f,s);if(f2)o.frequency.exponentialRampToValueAtTime(f2,s+dur*0.8);const g=ac.createGain();g.gain.setValueAtTime(0.0001,s);g.gain.linearRampToValueAtTime(peak*v,s+0.01);g.gain.exponentialRampToValueAtTime(0.0008,s+dur);o.connect(g);auOut(g,true);o.start(s);o.stop(s+dur+0.05)};
+  const noise=(type,f,q,dur,a,peak)=>{const n=noiseSrc(t,dur),bf=ac.createBiquadFilter();bf.type=type;bf.frequency.value=f;bf.Q.value=q;n.connect(bf);env(bf,a,peak,dur)};
+  switch(kind){
+    case "wave":noise("lowpass",500+Math.random()*300,0.7,2.6,1.0,0.16);break;
+    case "gull":for(let i=0;i<2;i++)tone("triangle",1500+Math.random()*200,950,0.32,0.035,i*0.36);break;
+    case "rain":noise("highpass",3500,0.5,1.6,0.2,0.07);noise("bandpass",900,0.6,1.6,0.6,0.08);break;
+    case "creak":tone("sawtooth",95+Math.random()*30,70,0.5,0.025);break;
+    case "bird":{const f=2600+Math.random()*900;for(let i=0;i<3+Math.floor(Math.random()*3);i++)tone("sine",f,f*1.25,0.07,0.03,i*0.1);break}
+    case "cricket":for(let i=0;i<6;i++)tone("square",4300,4200,0.025,0.012,i*0.05);break;
+    case "frog":tone("square",210,150,0.12,0.03);tone("square",230,160,0.12,0.03,0.18);break;
+    case "chime":for(const [k,a] of [[1,0.05],[2.7,0.02]])tone("sine",1480*k,0,1.6,a);break;
+    case "moktak":tone("sine",560,420,0.12,0.09);break;
+    case "murmur":for(let i=0;i<4;i++)noise("bandpass",300+Math.random()*500,4,0.5,0.1,0.05);break;
+    case "twang":tone("triangle",180,140,0.35,0.12);noise("bandpass",2400,3,0.12,0.005,0.08);break;
+    case "thock":tone("sine",160,90,0.12,0.18);noise("lowpass",900,1,0.08,0.003,0.12);break}}
+(()=>{let k=0;setInterval(()=>{if(document.hidden||!G.map||G.demo||UI.panel)return;k++;const m=G.map,p=G.player;
+  let water=0,land=0;for(let y=Math.max(0,p.ty-6);y<Math.min(m.h,p.ty+7);y+=2)for(let x=Math.max(0,p.tx-8);x<Math.min(m.w,p.tx+9);x+=2){const c=m.g[y][x];if(c==="~")water++;else land++}
+  const onDeck=m.objs.some(o=>o.k==="deck"&&p.tx>=o.x&&p.tx<o.x+o.dw&&p.ty>o.y&&p.ty<=o.y+o.dh);
+  const temple=m.objs.some(o=>(o.id==="temple"||o.k==="altar")&&Math.abs(o.x-p.tx)<12&&Math.abs(o.y-p.ty)<10);
+  const crowd=m.npcs.filter(n=>visible(n)&&n.look!=="chicken"&&Math.abs(n.tx-p.tx)<8&&Math.abs(n.ty-p.ty)<6).length;
+  const r=Math.random();
+  if(G.storm){amb("rain");if(k%4===0)sfx("wind");return}
+  if(water>land*0.5&&k%3===0)amb("wave");
+  if(onDeck&&r<0.18)amb("creak");
+  if(G.night){if(land>water&&r<0.5)amb(r<0.35?"cricket":"frog")}
+  else{if(water>land&&r<0.12)amb("gull");else if(land>water&&r<0.22)amb("bird")}
+  if(temple&&k%5===0)amb(k%10===0?"chime":"moktak");
+  if(crowd>=6&&r<0.4)amb("murmur");
+},1400)})();
+
+})();
+</script>
 </body>
 </html>
