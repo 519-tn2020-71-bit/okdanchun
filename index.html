@@ -576,7 +576,7 @@ function sprite(lookKey,dir,f,blink){
 /* ═════════ 그림 아바타 (앞·옆·뒤 3방향 시트) ═════════ */
 const AVA_OF={hkid:"a_hkid",jkid:"a_jkid",hpoor:"a_hpoor",hbeg:"a_hbeg",hsa:"a_hsa",jin:"a_jin",chun:"a_chun",mom:"a_mom",wife:"a_wife",hojang:"a_hojang",najol:"a_najol",sagong:"a_sagong",king:"a_king",
   official:"a_official",yeokjol:"a_yeokjol",gisaeng:"a_gisaeng",minister:"a_minister",villager:"a_villager",woman:"a_woman2",maid:"a_maid"};
-const AVA_H={a_hkid:31,a_jkid:31};
+const AVA_H={a_hkid:31,a_jkid:31,a_hbeg:43,a_hojang:43,a_hpoor:44,a_hsa:43,a_jin:42,a_king:42,a_minister:43,a_najol:47,a_official:43,a_sagong:47,a_villager:43};
 const AV={};
 function keyOut(a,W,H,bg){
   const near=i=>Math.abs(a[i]-bg[0])+Math.abs(a[i+1]-bg[1])+Math.abs(a[i+2]-bg[2]);
@@ -2549,6 +2549,75 @@ function dressUp(){if(LITE())return Promise.resolve();return new Promise(res=>{c
     if(e.target.closest("[data-ok]")){const good=sel.size===2&&[...sel].every(i=>items[i][1]);if(good){sfx("poof");gmClose(v);res()}else{sfx("wrong");shk(box);miss("변장");st.textContent="이 차림이면 누구나 벼슬아치인 줄 알아봐요. 남루한 차림 두 가지를 고르세요."}}});
   UI.onKey=()=>true})}
 
+/* ═════════ 음악에 맞춰 누르는 놀이 (여러 게임 공통, 2026-10-19) ═════════
+   장구 장단이 깔리고, 음표가 오른쪽에서 흘러와 붉은 판정선에 닿을 때 누르면 그 악기 소리가 난다.
+   높은 음은 위, 낮은 음은 아래에 그린다. 피리는 긴 음표를 누르고 있는 동안 소리가 이어진다(떼면 멈춤).
+   악기: piri(피리) · gayageum(가야금) · geomungo(거문고) · janggu(장구: 덩·쿵·덕) · kkwaeng(꽹과리)
+   musicPlay({eb,title,desc,inst,bpm,base,scale,song:[[박,길이(박),음 번호]…],btn,end:[잘함,보통,못함]})
+   엔진의 LITE(있으면)·UI·setBodyTalking·esc·AU·auInit·auOut·noiseSrc·gDrum 을 쓴다. 자동 진행기는 data-hot 이 붙은 [data-press] 를 누른다. */
+function muOpen(html){UI.modal=true;if(typeof setBodyTalking==="function")setBodyTalking(true);const v=document.createElement("div");v.className="veil";v.innerHTML=`<div class="sheet gm" style="text-align:center">${html}</div>`;document.getElementById("ui").appendChild(v);return v}
+function muClose(v){v.remove();UI.modal=false;UI.onKey=null;if(typeof setBodyTalking==="function")setBodyTalking(false)}
+function mgCanvas(html,w,h){const v=muOpen(html+`<canvas class="gmc" width="${w}" height="${h}" style="width:100%;max-width:${w*1.6}px;image-rendering:pixelated;border:2px solid var(--ink2);background:#cfe3ea;display:block;margin:10px auto"></canvas>`);return [v,v.querySelector("canvas.gmc")]}
+const MV={
+  piri(f,vel){const ac=AU.ctx,t=ac.currentTime+0.005;
+    const o=ac.createOscillator(),o2=ac.createOscillator(),g=ac.createGain(),bp=ac.createBiquadFilter(),lp=ac.createBiquadFilter(),l=ac.createOscillator(),lg=ac.createGain(),m2=ac.createGain();
+    o.type="square";o2.type="sawtooth";o.frequency.setValueAtTime(f*0.9,t);o.frequency.exponentialRampToValueAtTime(f,t+0.09);o2.frequency.setValueAtTime(f*0.9,t);o2.frequency.exponentialRampToValueAtTime(f*1.003,t+0.09);
+    l.frequency.value=5.8;lg.gain.setValueAtTime(0,t);lg.gain.linearRampToValueAtTime(f*0.022,t+0.45);l.connect(lg);lg.connect(o.frequency);lg.connect(o2.frequency);
+    bp.type="bandpass";bp.frequency.value=1250;bp.Q.value=1.8;lp.type="lowpass";lp.frequency.value=3400;m2.gain.value=0.5;o.connect(bp);o2.connect(m2);m2.connect(bp);bp.connect(lp);lp.connect(g);
+    g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(vel*1.25,t+0.04);g.gain.linearRampToValueAtTime(vel,t+0.14);auOut(g,true);
+    const n=noiseSrc(t,0.32),nf=ac.createBiquadFilter(),ng=ac.createGain();nf.type="bandpass";nf.Q.value=3;nf.frequency.setValueAtTime(700,t);nf.frequency.exponentialRampToValueAtTime(2800,t+0.22);
+    ng.gain.setValueAtTime(0.0001,t);ng.gain.linearRampToValueAtTime(vel*1.6,t+0.03);ng.gain.exponentialRampToValueAtTime(0.0008,t+0.3);n.connect(nf);nf.connect(ng);auOut(ng,true);
+    o.start(t);o2.start(t);l.start(t);let done=false;
+    return ()=>{if(done)return;done=true;const e=ac.currentTime;g.gain.cancelScheduledValues(e);g.gain.setValueAtTime(Math.max(0.0002,g.gain.value||vel),e);g.gain.exponentialRampToValueAtTime(0.0008,e+0.12);for(const x of [o,o2,l])x.stop(e+0.15)}},
+  pluckish(f,vel,dark){const ac=AU.ctx,t=ac.currentTime+0.005,dur=dark?1.6:1.1;
+    const o=ac.createOscillator(),o2=ac.createOscillator(),g=ac.createGain(),lp=ac.createBiquadFilter();o.type=dark?"sawtooth":"triangle";o2.type="sine";
+    o.frequency.setValueAtTime(f*(dark?1.03:1.01),t);o.frequency.exponentialRampToValueAtTime(f,t+0.06);o2.frequency.value=f*2;
+    if(dark){const l=ac.createOscillator(),lg=ac.createGain();l.frequency.value=4.5;lg.gain.setValueAtTime(0,t);lg.gain.linearRampToValueAtTime(f*0.025,t+0.4);l.connect(lg);lg.connect(o.frequency);l.start(t);l.stop(t+dur)}
+    lp.type="lowpass";lp.frequency.setValueAtTime(dark?1600:3600,t);lp.frequency.exponentialRampToValueAtTime(dark?300:900,t+dur*0.6);const g2=ac.createGain();g2.gain.value=0.25;o.connect(lp);o2.connect(g2);g2.connect(lp);lp.connect(g);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vel*1.4,t+0.006);g.gain.exponentialRampToValueAtTime(0.0008,t+dur);auOut(g,true);
+    const n=noiseSrc(t,0.05),nf=ac.createBiquadFilter(),ng=ac.createGain();nf.type=dark?"lowpass":"highpass";nf.frequency.value=dark?500:2500;ng.gain.setValueAtTime(vel*(dark?1.2:0.6),t);ng.gain.exponentialRampToValueAtTime(0.0008,t+0.05);n.connect(nf);nf.connect(ng);auOut(ng,false);
+    o.start(t);o2.start(t);o.stop(t+dur+0.05);o2.stop(t+dur+0.05);return ()=>{}},
+  gayageum(f,vel){return MV.pluckish(f,vel,false)},
+  geomungo(f,vel){return MV.pluckish(f*0.5,vel,true)},
+  janggu(f,vel,d){const ac=AU.ctx,t=ac.currentTime+0.005;if(typeof gDrum==="function")gDrum(["덩","쿵","덕"][d%3],t,0.6);return ()=>{}},
+  kkwaeng(f,vel){const ac=AU.ctx,t=ac.currentTime+0.005,n=noiseSrc(t,0.2),bf=ac.createBiquadFilter(),g=ac.createGain();bf.type="bandpass";bf.frequency.value=5000;bf.Q.value=3;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vel*2,t+0.003);g.gain.exponentialRampToValueAtTime(0.0008,t+0.18);n.connect(bf);bf.connect(g);auOut(g,false);
+    const o=ac.createOscillator(),og=ac.createGain();o.type="square";o.frequency.value=2300+((f|0)%3)*120;og.gain.setValueAtTime(vel*0.5,t);og.gain.exponentialRampToValueAtTime(0.0008,t+0.16);o.connect(og);auOut(og,false);o.start(t);o.stop(t+0.2);return ()=>{}}
+};
+function musicPlay(o){if(typeof LITE==="function"&&LITE())return Promise.resolve();return new Promise(res=>{
+  if(typeof auInit==="function")auInit();const spb=60/o.bpm,lead=2.2,W=320,H=150,HX=64,SPD=110,inst=o.inst||"piri",sus=inst==="piri",perc=inst==="janggu"||inst==="kkwaeng";
+  const scale=o.scale||[0,2,5,7,9];
+  const notes=o.song.map(([b,len,d])=>({t:lead+b*spb,len:sus?len*spb:0.12,d,hit:0}));const last=notes[notes.length-1],end=last.t+Math.max(last.len,0.3)+1.2;
+  const fq=d=>o.base*Math.pow(2,(Math.floor(d/scale.length)*12+scale[d%scale.length])/12);
+  const tip2=sus?" 긴 음표는 끝까지 누르고 있어요.":"";
+  const [v,c]=mgCanvas(`<span class="eb">${esc(o.eb||"장단")}</span><h2>${esc(o.title)}</h2><p class="note">${esc(o.desc)} 음표가 붉은 줄에 닿을 때 누르세요.${tip2} (Space · E · 단추)</p>`,W,H);
+  v.firstElementChild.insertAdjacentHTML("beforeend",`<div class="row"><button class="btn pri pressb" data-press style="touch-action:none">${esc(o.btn||"누르기")}</button></div><div class="st" id="muSt">&nbsp;</div>`);
+  const g=c.getContext("2d"),st=v.querySelector("#muSt"),btn=v.querySelector("[data-press]");let t0=performance.now(),alive=true,cur=null,stop=null,pop=null,beat=-9,good=0;
+  const now=()=>(performance.now()-t0)/1000,ac=()=>typeof AU!=="undefined"&&AU.ctx&&AU.sfxOn;
+  const lanes=perc?3:6,yOf=d=>perc?[40,75,110][d%3]:H-28-(d%6)*17;
+  const draw=()=>{if(!alive)return;const t=now();
+    g.fillStyle="#efe6cf";g.fillRect(0,0,W,H);for(let i=0;i<lanes;i++){g.fillStyle=i%2?"#e7dcc0":"#efe6cf";g.fillRect(0,yOf(i)-(perc?16:8),W,perc?32:17)}
+    if(perc){g.fillStyle="#8a6a44";g.font="12px sans-serif";["덩","쿵","덕"].forEach((s,i)=>g.fillText(s,6,yOf(i)+4))}
+    g.fillStyle="rgba(180,40,30,.85)";g.fillRect(HX-1,0,3,H);
+    const bt=Math.floor((t-lead)/spb);if(bt>beat&&!o.noBeat&&ac()){beat=bt;if(typeof gDrum==="function")gDrum(((bt%4)+4)%4===0?"덩":"덕",AU.ctx.currentTime+0.01,((bt%4)+4)%4===0?0.32:0.14)}
+    for(const n of notes){const x=HX+(n.t-t)*SPD,w=Math.max(10,n.len*SPD-6),y=yOf(n.d);if(x+w<-10||x>W+10)continue;
+      g.fillStyle=n.hit===2||n.hit===1?"#9ac48a":n.hit===-1?"#c9b9a9":inst==="geomungo"?"#5a3b22":inst==="kkwaeng"?"#b8902a":"#2f4a6d";g.beginPath();g.ellipse(x+5,y,perc?9:6,perc?9:6,0,0,7);g.fill();if(sus&&n.len>spb*1.1)g.fillRect(x+5,y-3,w-5,6)}
+    if(pop&&t-pop.t<0.6){g.globalAlpha=1-(t-pop.t)/0.6;g.fillStyle=pop.c;g.font="bold 18px sans-serif";g.fillText(pop.s,HX+10,24-(t-pop.t)*20);g.globalAlpha=1}
+    for(const n of notes)if(!n.hit&&t>n.t+0.22){n.hit=-1;pop={s:"놓침",c:"#8a6a44",t}}
+    if(cur&&t>=cur.t+cur.len){if(stop)stop();stop=null;cur.hit=2;cur=null}
+    const nx=notes.find(n=>!n.hit);v.dataset.hot=nx&&Math.abs(nx.t-t)<0.06?"1":"";
+    if(t>end){alive=false;const E=o.end||["가락이 흥겹게 이어진다","가락이 이어진다","장단이 고르지 않지만, 가락은 이어진다"];st.textContent=good>=notes.length-1?E[0]:good>=notes.length/2?E[1]:E[2];if(stop)stop();setTimeout(()=>{muClose(v);res(good)},900);return}
+    requestAnimationFrame(draw)};requestAnimationFrame(draw);
+  const press=()=>{if(!alive||cur)return;const t=now(),n=notes.find(x=>!x.hit&&Math.abs(x.t-t)<0.2);
+    if(!n){if(ac()&&sus){const s=MV.piri(fq(0)*0.94,0.03);setTimeout(s,90)}pop={s:sus?"삐익":"어긋남",c:"#8a6a44",t};return}
+    const e=Math.abs(n.t-t);good++;if(ac())stop=MV[inst](fq(n.d),inst==="piri"?0.09:0.12,n.d);pop=e<0.08?{s:"좋다!",c:"#b53a2c",t}:{s:"그렇지",c:"#2f4a6d",t};
+    if(sus){n.hit=1;cur=n}else{n.hit=2;stop=null}};
+  const release=()=>{if(!cur)return;if(stop)stop();stop=null;cur.hit=2;cur=null};
+  btn.addEventListener("pointerdown",e=>{e.preventDefault();press()});btn.addEventListener("pointerup",e=>{e.preventDefault();release()});btn.addEventListener("pointerleave",release);
+  btn.addEventListener("click",e=>{if(e.detail===0){press();setTimeout(release,250)}});
+  const kd=e=>{if(["Space","KeyE","Enter"].includes(e.code)&&!e.repeat){e.preventDefault();press()}},ku=e=>{if(["Space","KeyE","Enter"].includes(e.code))release()};
+  addEventListener("keydown",kd,true);addEventListener("keyup",ku,true);const clean=setInterval(()=>{if(!alive){removeEventListener("keydown",kd,true);removeEventListener("keyup",ku,true);clearInterval(clean)}},400);
+  UI.onKey=()=>true})}
+
 /* ══════════════ 이혈룡 편 ══════════════ */
 /* @숫자 는 전문(자료/mod.txt)의 그 줄을, @E숫자 는 교재 지문(자료/ebs.txt)의 그 줄을 글자 그대로 가져온다 (build.js 가 바꿔 넣음). 손으로 옮겨 적지 않는다. */
 /* S([[누구,글,이름,속마음]…]) : 본문 문장을 차례로 보여 줌. 본문이 아닌 글이 들어오면 멈춘다. 함수가 끼어 있으면 그 자리에서 실행 */
@@ -2706,7 +2775,7 @@ async function h3Chun(n){
   const F=G.f;if(F.chun)return;F.chun=1;
   await S([...nn("방안으로 들어가니 분벽사창(粉壁紗窓)이 찬란하니라.","좌우를 둘러보니, 천하 명화의 좋은 그림이 여기저기 걸렸는데, 위수(渭水)의 강태공이 문왕을 기다리며 곧은 낚시를 물에 던지고 어엿이 앉아 있는 모양이 완연하더라.","또 다른 그림에는 시중천자(時中天子) 이태백이 채석강 밝은 포도주를 취하게 먹고 물 속에 비친 달을 잡으려고 넌지시 손을 넣는 광경이 역력하며, 또 저편 벽에는 한나라 종실의 유황숙이 와룡 선생 제갈량을 맞으려고 남양(南洋)땅의 초당으로 풍설 속에 적토마(赤免馬)를 빗겨 타고 지향 없이 가는 정경이 선명하며, 또 한편에는 산중서차인 두 노인이 한가롭게 앉은 모양이 신전의 경지를 보이며, 또 다른 그림에는 상상사호(常常四豪) 네 노인이 바둑판을 앞에 놓고 흑백을 희롱하며, 그리고 대동강의 좋은 풍경을 그린 그림도 여기 저기 걸려 있더라.")]);trait("list");
   holdSet(n,"cup");await S([...nn("옥단춘은 주안상을 들여놓고, 향기 높은 계자조를 유리잔에 가득 부어 들고 권주가를 한 가락 부르면서 이혈룡에게 권하는데,")]);await give(n,me(),"cup");
-  await rhythm({eb:"권주가",title:"무릎장단 맞추기",desc:"옥단춘이 권주가를 한 가락 부른다. 표시가 붉은 칸(덩·쿵)에 올 때 눌러 장단을 맞춰 보세요.",jang:"gut",inst:"pluck",base:329.63,label:"덩"});
+  await musicPlay({eb:"권주가",title:"무릎장단 맞추기",desc:"옥단춘이 권주가를 한 가락 부른다. 무릎을 치며 덩·쿵·덕 장단을 맞춰 보세요.",inst:"janggu",btn:"치기",bpm:96,base:329.63,song:[[0,1,0],[1.5,1,2],[2,1,1],[3,1,2],[4,1,0],[5.5,1,2],[6,1,1],[7,1,2],[8,1,0],[9,1,1],[10,1,2],[11,1,2],[12,1,0]],end:["장단이 착착 맞는다","장단이 이어진다","장단이 엇나가도 노래는 이어진다"]});
   await S([...qq("C",0,"일배 일배 부인배의 보통 술이 아니오라, 한무제 승로반(承露盤)에 옥로(玉露) 받은 술이오니, 이 술 한잔 잡수시면 천만년을 사시리라.","전에 한번 몸 뵈었으나 내일 보면 구면이니 사양 말고 잡수시오."),...nn("이생원 한 두 잔 먹는 사이에 어느덧 취하여 취중에 가로되,"),...qq("H",0,"하아, 지난 일을 생각하니 세상사가 허무(虛無)로다.","천만 무궁한 이 자리의 흥취(興趣)를 어찌 다 말하리요."),...nn("하고, 밤 가는 줄도 모르며 옥단춘의 환대를 받았으니, 그 뒤로 이생원은 옥단춘의 집에서 신세를 지게 되니라.")]);trait("song");holdDel(me(),"cup");
   await card("세월이 흘러","과거 소식","왕실에 세자가 태어나, 나라에서 과거를 보인다고 한다.");
   await S([...nn("이럭저럭 세월이 흘러서 왕실에 세자(世子)가 탄생하자, 나라의 경사를 축하하여 태평과(太平科)의 과거를 보인다는 소문을 들은 옥단춘이 기뻐하고 이혈룡에게 권하여 말하기를,"),...qq("C",0,"과거 보인다는 소식이 들리니, 낭군은 과거를 보러 상격하십시오.","충신의 후손으로서 이런 기회를 어찌 허송하겠습니까?"),...qq("H",0,"그대 말이 당연하나 늙으신 모친이 내가 오늘 올까 내일 올까 하고 기다리시면서, 초조하게 간장을 녹이고 계신 것을 생각하면, 오늘까지 이렇게 편히 지낸 일이 불효임을 어찌 모르리오.","그러나 이 꼴로 서울 가서 무슨 면목으로 노모와 처자를 대하리오."),...nn("하고, 탄식하는 그의 두 눈에서 눈물이 주르르 흐르니, 옥단춘이 거듭 위로하면서,"),...qq("C",0,"과거를 힘써 봐서 입신양명(立身揚名)하온 후에 영화를 볼 것이니 너무 상심 마시고 속히 상경(上京)하십시오."),...nn("하고, 행장을 수습하여 주면서 신신당부하니라.")]);
@@ -2967,7 +3036,7 @@ async function c2Dig(id){
 }
 async function c2Talk(n){
   const F=G.f;if(F.talk)return;F.talk=1;await give(me(),n,"cup");
-  await rhythm({eb:"권주가",title:"권주가 한 가락",desc:"권주가를 부르며 술을 권한다. 표시가 붉은 칸(덩·쿵)에 올 때 눌러 장단을 맞춰 보세요.",jang:"gut",inst:"pluck",base:329.63,label:"덩"});
+  await musicPlay({eb:"권주가",title:"권주가 한 가락",desc:"권주가를 부르며 술을 권한다. 가야금 가락에 맞춰 눌러 보세요.",inst:"gayageum",btn:"뜯기",bpm:92,base:329.63,scale:[0,2,5,7,9],song:[[0,1,2],[1,1,3],[2,1,4],[3,1,3],[4,2,2],[6,1,1],[7,1,2],[8,1,4],[9,1,5],[10,1,4],[11,1,3],[12,2,2]]});
   await S([...qq("C",0,"일배 일배 부인배의 보통 술이 아니오라, 한무제 승로반(承露盤)에 옥로(玉露) 받은 술이오니, 이 술 한잔 잡수시면 천만년을 사시리라.","전에 한번 몸 뵈었으나 내일 보면 구면이니 사양 말고 잡수시오."),...nn("이생원 한 두 잔 먹는 사이에 어느덧 취하여 취중에 가로되,"),...qq("hpoor",0,"하아, 지난 일을 생각하니 세상사가 허무(虛無)로다.","천만 무궁한 이 자리의 흥취(興趣)를 어찌 다 말하리요."),...nn("하고, 밤 가는 줄도 모르며 옥단춘의 환대를 받았으니, 그 뒤로 이생원은 옥단춘의 집에서 신세를 지게 되니라.")]);trait("song");holdDel(n,"cup");
   await card("세월이 흘러","과거 소식","왕실에 세자가 태어나, 나라에서 과거를 보인다고 한다.");
   await S([...nn("이럭저럭 세월이 흘러서 왕실에 세자(世子)가 탄생하자, 나라의 경사를 축하하여 태평과(太平科)의 과거를 보인다는 소문을 들은 옥단춘이 기뻐하고 이혈룡에게 권하여 말하기를,"),...qq("C",0,"과거 보인다는 소식이 들리니, 낭군은 과거를 보러 상격하십시오.","충신의 후손으로서 이런 기회를 어찌 허송하겠습니까?"),...qq("hpoor",0,"그대 말이 당연하나 늙으신 모친이 내가 오늘 올까 내일 올까 하고 기다리시면서, 초조하게 간장을 녹이고 계신 것을 생각하면, 오늘까지 이렇게 편히 지낸 일이 불효임을 어찌 모르리오.","그러나 이 꼴로 서울 가서 무슨 면목으로 노모와 처자를 대하리오."),()=>{n.cry=1;face("hpoor","cry")},...nn("하고, 탄식하는 그의 두 눈에서 눈물이 주르르 흐르니, 옥단춘이 거듭 위로하면서,")]);n.cry=0;face("hpoor");
@@ -2993,7 +3062,7 @@ CHS.c[3]={mood:"night",
   }};
 async function c3Song(){
   const F=G.f;if(F.song)return;F.song=1;
-  await rhythm({eb:"거문고",title:"거문고를 타며",desc:"홀로 거문고를 안고 임 생각을 달랜다. 표시가 붉은 칸에 올 때 눌러 줄을 뜯어 보세요.",jang:"jin",inst:"geomungo",beat:0.5,base:196,label:"뜯기"});
+  await musicPlay({eb:"거문고",title:"거문고를 타며",desc:"홀로 거문고를 안고 임 생각을 달랜다. 느린 가락에 맞춰 줄을 뜯어 보세요.",inst:"geomungo",btn:"뜯기",bpm:58,base:196,scale:[0,3,5,7,10],song:[[0,2,4],[2,1,3],[3,1,2],[4,2,1],[6,1,2],[7,1,3],[8,2,4],[10,1,3],[11,2,2]],end:["줄 소리가 밤뜰에 낮게 울린다","줄 소리가 이어진다","손이 떨려도 줄 소리는 이어진다"]});
   face("chun","cry");emote(me(),"note");
   await S([...qq("C",0,"임아 임아 낭군님아, 전세의 연분으로 청실홍실 맺은 사이는 아니지만, 눈정으로 맺은 정이 남과는 유달라서, 밥상을 당겨 놓고 임의 생각 문득 나면, 밥도 물도 목이 메오.","그러나 낭군님은 이처럼 타는 내 간장을 모르는가?","홍문연 높은 잔치에 가서 천하 경률(經律) 논하는가?","계명산 추야월(秋夜月)에 장량(長良)의 옥퉁소 소리로 판철제자 헤어졌나?","항우의 어린 고집 범증의 말 안 듣고 판철제자 다 간 후에 우미인과 이별을 구경하는가?","아아 천리마(千里馬) 타고 오실 임의 행차 어이 이리 느리신고.","임아 임아, 서방님아, 과거에 낙방되어 무안하여 못 오시나?","과거는 하였지만 조정의 내직으로 못 오시는가.","일신이 귀히 되어 나를 아주 잊으셨나?","그분이 사람으로 설마 나를 잊었을까?","편지 한 장 없는 것은 인편이 없음인가?","과거를 보았으면 급제도 하였을 텐데, 운이 나빠 낙방(落榜)되었나?","아아, 어찌 이리 소식 없고 오시는 길 묘연한가?","무정하신 낭군님아, 침침칠야(沈沈漆夜) 야삼경에 홀로 누워 기다리니, 눈물만 오락가락 한숨으로 벗을 삼고, 생각만은 임뿐이라.")]);trait("song");
   await quiz("chun","옥단춘은 임이 오지 않는 까닭을 여러 가지로 짐작해요. 다음 가운데 옥단춘이 짐작한 것이 아닌 것은?",["과거에 낙방해 무안해서 못 오는가","귀하게 되어 나를 잊었는가","다른 고을의 감사가 되어 떠났는가"],2,"노래에 나온 짐작은 낙방, 조정의 내직, 귀하게 되어 잊음, 인편이 없음이었어요.");
