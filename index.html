@@ -608,7 +608,7 @@ function cutSheet(img,key){
   const out=views.map(v=>{const w=v.x1-v.x0+1,h=v.y1-v.y0+1;const o=document.createElement("canvas");o.width=Math.max(1,Math.round(w*sc));o.height=Math.max(1,Math.round(h*sc));
     const og=o.getContext("2d");og.imageSmoothingEnabled=true;og.imageSmoothingQuality="high";og.drawImage(c,v.x0,v.y0,w,h,0,0,o.width,o.height);
     const od=og.getImageData(0,0,o.width,o.height),oa=od.data;for(let i=3;i<oa.length;i+=4)oa[i]=oa[i]>110?255:0;og.putImageData(od,0,0);return o});
-  return{d:out[0],l:out[1],u:out[2]};
+  const f=out[0],fg=f.getContext("2d"),fa=fg.getImageData(0,0,f.width,f.height).data,FW=f.width,FH=f.height;let rows=0,gap=0;for(let y=Math.round(FH*0.78);y<Math.round(FH*0.88);y++){let L=-1,R=-1;for(let x=0;x<FW;x++)if(fa[(y*FW+x)*4+3]){if(L<0)L=x;R=x}if(R-L<4)continue;rows++;const m0=L+Math.floor((R-L)*0.3),m1=R-Math.floor((R-L)*0.3);for(let x=m0;x<=m1;x++)if(!fa[(y*FW+x)*4+3]){gap++;break}}return{d:out[0],l:out[1],u:out[2],robe:rows>0&&gap<rows*0.3};
 }
 function loadAvatars(){
   for(const key of new Set(Object.values(AVA_OF))){
@@ -621,7 +621,7 @@ loadAvatars();
 function drawAvatar(e,v,sx,sy,t){
   const img=e.dir==="u"?v.u:e.dir==="d"?v.d:v.l,flip=e.dir==="r";
   const w=img.width/Q,h=img.height/Q,cx=sx+8,by=sy+15,ph=e.ph||0;
-  const IW=img.width,IH=img.height,legH=Math.round(IH*0.24),up=IH-legH,skirt=SKIRT.has(AVA_OF[e.look]);
+  const IW=img.width,IH=img.height,legH=Math.round(IH*0.24),up=IH-legH,skirt=SKIRT.has(AVA_OF[e.look])||v.robe;
   /* 걸음: 왼발·오른발이 번갈아 (A>0 왼발, A<0 오른발) */
   const A=e.moving?Math.sin(((e.step%2)+e.prog)*Math.PI):0;
   const bob=e.moving?-Math.round(Math.abs(A)):0;
@@ -629,7 +629,8 @@ function drawAvatar(e,v,sx,sy,t){
   if(!(e.mount&&v!==AV.a_horse)){ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();ctx.ellipse(cx,by,Math.max(6,w*0.36),2.6,0,0,Math.PI*2);ctx.fill()}
   ctx.save();ctx.translate(cx,by+bob);ctx.scale((flip?-1:1)/Q,1/Q);
   const x0=-Math.round(IW/2),top=-IH,half=Math.floor(IW/2);
-  if(e.dir==="l"||e.dir==="r"){
+  if(skirt){const sw=(e.dir==="l"||e.dir==="r"?1.6:0.8)*Q;for(let y=0;y<legH;y+=Q){const hh=Math.min(Q,legH-y),dx=Math.round(A*sw*(y+hh)/legH);ctx.drawImage(img,0,up+y,IW,hh,x0+dx,top+up+y,IW,hh)}}
+  else if(e.dir==="l"||e.dir==="r"){
     const fx=Math.round(A*(skirt?1:2.2)*Q);
     ctx.drawImage(img,half,up,IW-half,legH,x0+half+fx,top+up,IW-half,legH);
     ctx.drawImage(img,0,up,half,legH,x0-fx,top+up,half,legH);
