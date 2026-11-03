@@ -844,6 +844,7 @@ function visible(n){return !n.show||n.show()}
 function blocked(x,y,self){
   const m=G.map;if(x<0||y<0||x>=m.w||y>=m.h)return true;
   if(SOLID.has(tileAt(m,x,y)))return true;
+  if(self&&self===G.player&&typeof battleBlock==="function"&&battleBlock(x,y))return true;
   for(const o of m.objs){if(o.pass||(o.hide&&o.hide()))continue;if(o.k==="door"&&G.f.gateOpen)continue;
     if(x>=o.x&&x<o.x+o.w&&y>=o.y&&y<o.y+o.h)return true}
   for(const n of m.npcs){if(n===self||!visible(n))continue;if(n.tx===x&&n.ty===y)return true;if(n.moving&&n.nx===x&&n.ny===y)return true}
@@ -1274,7 +1275,7 @@ function openHist(){
 document.addEventListener("click",ev=>{if(ev.target.closest("[data-hist]")){ev.stopPropagation();ev.preventDefault();openHist()}},true);
 
 /* ═════════ 장면 연출 ═════════ */
-function lungeAt(a,b){const dx=Math.sign(b.tx-a.tx),dy=Math.sign(b.ty-a.ty);a.dir=dx>0?"r":dx<0?"l":dy<0?"u":"d";a.lunge={t0:performance.now()/1000,dx,dy}}
+function lungeAt(a,b){const dx=Math.sign(b.tx-a.tx),dy=Math.sign(b.ty-a.ty);a.dir=dx>0?"r":dx<0?"l":dy<0?"u":"d";if(typeof weaponOf==="function"&&a.look!=="bell"&&weaponOf(a))a.swing={t0:performance.now()/1000};else a.lunge={t0:performance.now()/1000,dx,dy}}
 /* 머리채를 잡고 치는 장면: 원문 그대로 '휘휘 칭칭', '이리 치고', '저리 치며' */
 async function scuffle(att,vic,words){
   const p=G.player;if(att!==p&&Math.abs(att.tx-vic.tx)+Math.abs(att.ty-vic.ty)>1)setNear(att,[[vic.tx-1,vic.ty],[vic.tx+1,vic.ty],[vic.tx,vic.ty+1],[vic.tx,vic.ty-1]]);
@@ -1972,18 +1973,25 @@ function drawHeld(e,sx,sy,topY,t){
     if(e.down)continue;
     if(h.pos==="back"){h.d(sx+8+(e.dir==="r"?-6:e.dir==="l"?6:0),Math.round(topY+17)-bob,t);continue}
     if(e.look==="bell"){const n=a.length;h.d(sx+8+(hand-(n-1)/2)*10,Math.round(topY+4+Math.sin(t*4+hand)*1.2),t);hand++;continue}
-    if(hand===0&&e.swing&&!h.pos){const q=(performance.now()/1000-e.swing.t0)/0.26;if(q>=0&&q<1){const d=e.dir,base={r:Math.PI/2,l:-Math.PI/2,u:0,d:Math.PI}[d],hx=sx+8+(d==="l"?-5:d==="r"?5:0),hy=sy+3+(d==="u"?-5:d==="d"?4:0);
-        ctx.save();
-        if(id==="spear"){const [dx,dy]=DIRV[d],reach=Math.sin(Math.PI*q)*10;ctx.translate(hx+dx*reach,hy+dy*reach);ctx.rotate(base);ctx.scale(1.2,1.2);h.d(0,7,t);ctx.restore();
-          ctx.strokeStyle="rgba(255,255,255,"+(0.8*(1-q))+")";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(hx+dx*8,hy+dy*8);ctx.lineTo(hx+dx*(20+reach),hy+dy*(20+reach));ctx.stroke()}
-        else{const s=d==="l"||d==="u"?-1:1,a0=base-s*1.5,ang=a0+s*2.8*q;ctx.translate(hx,hy);ctx.rotate(ang);ctx.scale(1.35,1.35);h.d(0,0,t);ctx.restore();
-          ctx.strokeStyle="rgba(255,255,255,"+(0.85*(1-q))+")";ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(hx,hy,22,a0-Math.PI/2,ang-Math.PI/2,s<0);ctx.stroke();
-          ctx.strokeStyle="rgba(255,243,160,"+(0.5*(1-q))+")";ctx.lineWidth=1;ctx.beginPath();ctx.arc(hx,hy,17,a0-Math.PI/2,ang-Math.PI/2,s<0);ctx.stroke()}
-        hand++;continue}}
+    if(e.swing&&id===weaponOf(e)&&performance.now()/1000-e.swing.t0<SWING_T){if(!G.battle||e!==G.player)drawSwing(e,sx,sy,t);hand++;continue}
     if(hand<2){const right=(hand===0)!==(e.dir==="l");h.d(sx+(right?15:1),sy+5-bob,t);hand++}
     else{h.d(sx+8+(over-(nOver-1)/2)*11,Math.round(topY-3+Math.sin(t*3+over)*1.5),t);over++}
   }
 }
+/* 휘두르기: 준비(머리 뒤로 듦) → 내리치기 → 멈춤. 칼은 손잡이를 축으로 돈다 */
+const SWING_T=0.34;
+function weaponOf(e){return holdList(e).find(i=>HELD[i]&&!HELD[i].pos&&/^(sword|spear|hammer|axe|knife|pestle|stick)$/.test(i))}
+function drawSwing(e,sx,sy,t){if(!e.swing)return;const q=(performance.now()/1000-e.swing.t0)/SWING_T;if(q<0||q>=1)return;
+  const id=weaponOf(e),h=id&&HELD[id];if(!h)return;
+  const d=e.dir,[dx,dy]=DIRV[d],base={r:Math.PI/2,l:-Math.PI/2,u:0,d:Math.PI}[d],hx=sx+8+dx*4,hy=sy+2+(dy<0?-3:dy>0?3:0);ctx.save();
+  if(id==="spear"){const k=q<0.3?-q/0.3*3:q<0.55?-3+(q-0.3)/0.25*15:12*(1-(q-0.55)/0.45*0.6);ctx.translate(hx+dx*k,hy+dy*k);ctx.rotate(base);ctx.scale(1.2,1.2);h.d(0,7,t);ctx.restore();
+    if(q>0.3&&q<0.85){ctx.strokeStyle="rgba(255,255,255,"+(0.8*(1-(q-0.3)/0.55))+")";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(hx+dx*10,hy+dy*10);ctx.lineTo(hx+dx*(26+k),hy+dy*(26+k));ctx.stroke()}return}
+  const s=d==="l"||d==="u"?-1:1,up=base-s*1.95,down=base+s*0.95,ease=x=>1-Math.pow(1-x,3);
+  const ang=q<0.3?base-s*(1.2+0.75*ease(q/0.3)):q<0.52?up+(down-up)*ease((q-0.3)/0.22):down;
+  if(q>=0.3){const a1=q<0.52?ang:down,fade=q<0.52?0.9:0.9*(1-(q-0.52)/0.48),R=24;
+    ctx.fillStyle="rgba(255,255,255,"+fade*0.55+")";ctx.beginPath();ctx.arc(hx,hy,R,up-Math.PI/2,a1-Math.PI/2,s<0);ctx.arc(hx,hy,R-7,a1-Math.PI/2,up-Math.PI/2,s>0);ctx.closePath();ctx.fill();
+    ctx.strokeStyle="rgba(255,250,215,"+fade+")";ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(hx,hy,R,up-Math.PI/2,a1-Math.PI/2,s<0);ctx.stroke()}
+  ctx.translate(hx,hy);ctx.rotate(ang);ctx.scale(1.35,1.35);h.d(0,0,t);ctx.restore()}
 /* 건네기: 준 사람 손에서 받는 사람 손으로 날아가 그 인물에게 생긴다 */
 async function give(from,to,id,opt){
   opt=opt||{};if(from&&!opt.keep)holdDel(from,id);
@@ -2367,6 +2375,10 @@ paintBag=function(){const el=document.getElementById("bag");if(!el)return;const 
 (()=>{const st=document.createElement("style");st.textContent=`#bhud{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:7;font-family:var(--ui);font-size:14px;background:rgba(29,24,19,.82);color:#f1ead8;border:2px solid #f2c94c;padding:6px 14px;white-space:nowrap;pointer-events:none}
 #bhud b{color:#f07a6a;letter-spacing:2px}#bhud i{font-style:normal;color:#9aa3ad;letter-spacing:2px}#bhud span{margin-left:12px;color:#f2c94c}
 @media (pointer:coarse){#bhud{bottom:calc(164px + env(safe-area-inset-bottom,0px));font-size:13px}}`;document.head.appendChild(st)})();
+/* 큰 요괴는 그림이 세 칸쯤이라 둘레 한 칸에 들어가지 못하고 두 칸 떨어져 치고 맞는다 */
+function bigFoe(f){return f.e.look==="monster"}
+function inReach(f,p){const ax=Math.abs(f.e.tx-p.tx),ay=Math.abs(f.e.ty-p.ty);return bigFoe(f)?Math.max(ax,ay)<=2&&Math.min(ax,ay)<=1&&ax+ay>0:ax+ay===1}
+function battleBlock(x,y){const B=G.battle;return !!B&&B.foes.some(f=>f.hp>0&&bigFoe(f)&&Math.max(Math.abs(f.e.tx-x),Math.abs(f.e.ty-y))===1)}
 function fieldBattle(cfg){
   return new Promise(res=>{
     const p=G.player,now=()=>performance.now()/1000;
@@ -2381,9 +2393,9 @@ function fieldBattle(cfg){
     const end=()=>{if(B.over)return;B.over=true;G.battle=null;G.lock=lockWas;hud.remove();if(act)act.textContent=actTxt;setTimeout(()=>res(B),350)};
     const check=()=>{if(cfg.until?cfg.until(B):!alive().length)end()};
     B.attack=()=>{if(B.over||B.acd>0||UI.modal)return;B.acd=0.3;const [dx,dy]=DIRV[p.dir];
-      const adj=alive().filter(q=>Math.abs(q.e.tx-p.tx)+Math.abs(q.e.ty-p.ty)===1),front=q=>q.e.tx===p.tx+dx&&q.e.ty===p.ty+dy,can=q=>q.hp>(q.floor||0);
+      const adj=alive().filter(q=>inReach(q,p)),front=q=>Math.sign(q.e.tx-p.tx)===dx&&Math.sign(q.e.ty-p.ty)===dy,can=q=>q.hp>(q.floor||0);
       let f=adj.find(q=>front(q)&&can(q))||adj.find(can)||adj.find(front)||adj[0];
-      const armed=p.look!=="bell"&&holdList(p).some(id=>HELD[id]&&!HELD[id].pos);
+      const armed=p.look!=="bell"&&weaponOf(p);
       if(!f){sfx("swish");if(armed)p.swing={t0:now()};else p.lunge={t0:now(),dx,dy};return}
       if(armed){p.dir=f.e.tx<p.tx?"l":f.e.tx>p.tx?"r":f.e.ty<p.ty?"u":"d";p.swing={t0:now()};sfx("swish")}else lungeAt(p,f.e);B.last=B.t;B.hits++;f.e.hurt=0.35;G.shake=Math.max(G.shake||0,3);sfx(cfg.hitSfx||"slash");
       const hurt=f.hp>(f.floor||0);if(hurt)f.hp--;else sfx("clang");pop(f.e,!hurt?"막았다!":f.hp<=0?(cfg.endWord||"쿵!"):(cfg.word||"챙!"),hurt?null:"#dfe6ef");
@@ -2395,21 +2407,21 @@ function fieldBattle(cfg){
       if(B.t-(B.last||0)>10){B.last=B.t;for(const f of alive()){const e=f.e;if(Math.abs(e.tx-p.tx)+Math.abs(e.ty-p.ty)>2&&!e.moving)setNear(e,[[p.tx+2,p.ty],[p.tx-2,p.ty],[p.tx,p.ty+2],[p.tx,p.ty-2],[p.tx+1,p.ty+1],[p.tx-1,p.ty-1]])}}
       for(const f of alive()){const e=f.e,d=Math.abs(e.tx-p.tx)+Math.abs(e.ty-p.ty);
         if(f.tele>0){f.tele-=dt;if(f.tele<=0){e.dir=p.tx<e.tx?"l":p.tx>e.tx?"r":p.ty<e.ty?"u":"d";
-            if(Math.abs(e.tx-p.tx)+Math.abs(e.ty-p.ty)<=1){lungeAt(e,p);B.my--;p.hurt=0.4;sfx("slap");G.shake=Math.max(G.shake||0,4);pop(p,"퍽!","#f2c94c");
+            if(inReach(f,p)){lungeAt(e,p);B.my--;p.hurt=0.4;sfx("slap");G.shake=Math.max(G.shake||0,4);pop(p,"퍽!","#f2c94c");
               if(B.my<=0){B.my=B.myMax;toast("다시 일어서다","숨을 고르고 기력을 되찾았어요")}paint()}
             else{sfx("swish");pop(e,"휙","#dfe6ef")}
             f.cd=(f.slow?2.2:1.5)+Math.random()*0.8;B.gcd=0.9}continue}
         f.cd-=dt;if(f.cd>0||e.moving)continue;
-        if(d<=1){if(B.gcd>0||alive().some(q=>q.tele>0)){f.cd=0.3;continue}f.tele=f.slow?1.4:1.05;e.dir=p.tx<e.tx?"l":p.tx>e.tx?"r":p.ty<e.ty?"u":"d"}
+        if(inReach(f,p)){if(B.gcd>0||alive().some(q=>q.tele>0)){f.cd=0.3;continue}f.tele=f.slow?1.4:1.05;e.dir=p.tx<e.tx?"l":p.tx>e.tx?"r":p.ty<e.ty?"u":"d"}
         else{const ox=Math.sign(p.tx-e.tx),oy=Math.sign(p.ty-e.ty);const tries=Math.abs(p.tx-e.tx)>=Math.abs(p.ty-e.ty)?[[ox,0],[0,oy]]:[[0,oy],[ox,0]];
           for(const [mx,my] of tries){if(!mx&&!my)continue;const dir=mx>0?"r":mx<0?"l":my<0?"u":"d";if(tryMove(e,dir))break}
           f.cd=f.slow?0.7:0.35}}
       if(cfg.until&&cfg.until(B))end()};
-    B.draw=t=>{const cx=G.cam.x,cy=G.cam.y;for(const f of alive()){const [px,py]=entPos(f.e),sx=Math.round(px-cx),sy=Math.round(py-cy)-(f.e.mount?48:f.e.look==="monster"?46:f.e.look==="tiger"?26:34);
+    B.draw=t=>{const cx=G.cam.x,cy=G.cam.y;if(p.swing){const [qx,qy]=entPos(p);drawSwing(p,Math.round(qx-cx),Math.round(qy-cy)-(p.lift||0)-(p.mount?18:0),t)}for(const f of alive()){const [px,py]=entPos(f.e),sx=Math.round(px-cx),sy=Math.round(py-cy)-(f.e.mount?48:f.e.look==="monster"?46:f.e.look==="tiger"?26:34);
         const w=f.boss?22:16,x=sx+8-w/2;ctx.fillStyle="#1d1813";ctx.fillRect(x-1,sy-1,w+2,5);ctx.fillStyle="#5a2a22";ctx.fillRect(x,sy,w,3);ctx.fillStyle=f.boss?"#f2c94c":"#e0493a";ctx.fillRect(x,sy,Math.round(w*f.hp/f.max),3);
         if(f.tele>0&&Math.sin(t*22)>-0.3){ctx.fillStyle="#1d1813";ctx.fillRect(sx+4,sy-13,8,11);ctx.fillStyle="#ff5a48";ctx.fillRect(sx+7,sy-11,2,5);ctx.fillRect(sx+7,sy-5,2,2)}}};
     /* 점검용: 가까운 적 옆으로 가서 친다 */
-    B.auto=()=>{const f=alive().find(f=>f.hp>(f.floor||0))||alive()[0];if(!f||B.over)return;const e=f.e;if(Math.abs(e.tx-p.tx)+Math.abs(e.ty-p.ty)!==1)setNear(p,[[e.tx-1,e.ty],[e.tx+1,e.ty],[e.tx,e.ty+1],[e.tx,e.ty-1]]);
+    B.auto=()=>{const f=alive().find(f=>f.hp>(f.floor||0))||alive()[0];if(!f||B.over)return;const e=f.e;if(!inReach(f,p)){const r=bigFoe(f)?2:1;setNear(p,[[e.tx-r,e.ty],[e.tx+r,e.ty],[e.tx,e.ty+r],[e.tx,e.ty-r]])}
       p.dir=e.tx<p.tx?"l":e.tx>p.tx?"r":e.ty<p.ty?"u":"d";B.acd=0;B.t+=3;B.attack()};
     paint();
   });
