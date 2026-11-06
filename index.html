@@ -1986,9 +1986,9 @@ function drawSwing(e,sx,sy,t){if(!e.swing)return;const q=(performance.now()/1000
   const d=e.dir,[dx,dy]=DIRV[d],base={r:Math.PI/2,l:-Math.PI/2,u:0,d:Math.PI}[d],hx=sx+8+dx*4,hy=sy+2+(dy<0?-3:dy>0?3:0);ctx.save();
   if(id==="spear"){const k=q<0.3?-q/0.3*3:q<0.55?-3+(q-0.3)/0.25*15:12*(1-(q-0.55)/0.45*0.6);ctx.translate(hx+dx*k,hy+dy*k);ctx.rotate(base);ctx.scale(1.2,1.2);h.d(0,7,t);ctx.restore();
     if(q>0.3&&q<0.85){ctx.strokeStyle="rgba(255,255,255,"+(0.8*(1-(q-0.3)/0.55))+")";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(hx+dx*10,hy+dy*10);ctx.lineTo(hx+dx*(26+k),hy+dy*(26+k));ctx.stroke()}return}
-  const s=d==="l"||d==="u"?-1:1,up=base-s*1.95,down=base+s*0.95,ease=x=>1-Math.pow(1-x,3);
-  const ang=q<0.3?base-s*(1.2+0.75*ease(q/0.3)):q<0.52?up+(down-up)*ease((q-0.3)/0.22):down;
-  if(q>=0.3){const a1=q<0.52?ang:down,fade=q<0.52?0.9:0.9*(1-(q-0.52)/0.48),R=24;
+  const s=d==="l"||d==="u"?-1:1,up=base-s*1.1,down=base+s*0.6,ease=x=>1-Math.pow(1-x,3);
+  const ang=q<0.25?base-s*(0.5+0.6*ease(q/0.25)):q<0.42?up+(down-up)*ease((q-0.25)/0.17):down;
+  if(q>=0.25){const a1=q<0.42?ang:down,fade=q<0.42?0.9:0.9*(1-(q-0.42)/0.58),R=24;
     ctx.fillStyle="rgba(255,255,255,"+fade*0.55+")";ctx.beginPath();ctx.arc(hx,hy,R,up-Math.PI/2,a1-Math.PI/2,s<0);ctx.arc(hx,hy,R-7,a1-Math.PI/2,up-Math.PI/2,s>0);ctx.closePath();ctx.fill();
     ctx.strokeStyle="rgba(255,250,215,"+fade+")";ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(hx,hy,R,up-Math.PI/2,a1-Math.PI/2,s<0);ctx.stroke()}
   ctx.translate(hx,hy);ctx.rotate(ang);ctx.scale(1.35,1.35);h.d(0,0,t);ctx.restore()}
@@ -2392,7 +2392,7 @@ function fieldBattle(cfg){
     const pop=(e,word,col)=>FX.push({k:"hit",e,t0:now(),dur:0.6,word,col:col||"#f07a6a"});
     const end=()=>{if(B.over)return;B.over=true;G.battle=null;G.lock=lockWas;hud.remove();if(act)act.textContent=actTxt;setTimeout(()=>res(B),350)};
     const check=()=>{if(cfg.until?cfg.until(B):!alive().length)end()};
-    B.attack=()=>{if(B.over||B.acd>0||UI.modal)return;B.acd=0.3;const [dx,dy]=DIRV[p.dir];
+    B.attack=()=>{if(B.over||B.acd>0||UI.modal)return;B.acd=0.4;const [dx,dy]=DIRV[p.dir];
       const adj=alive().filter(q=>inReach(q,p)),front=q=>Math.sign(q.e.tx-p.tx)===dx&&Math.sign(q.e.ty-p.ty)===dy,can=q=>q.hp>(q.floor||0);
       let f=adj.find(q=>front(q)&&can(q))||adj.find(can)||adj.find(front)||adj[0];
       const armed=p.look!=="bell"&&weaponOf(p);
